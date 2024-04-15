@@ -1,9 +1,12 @@
 package hypeql
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 )
+
+// TEST #1
 
 type A struct {
 	Foo   string `json:"foo"`
@@ -79,6 +82,27 @@ func TestGeneral(t *testing.T) {
 	mustBe := `{"bar":true,"clist":[{"text":"Hello"},{"text":"Hello"}],"foo":""}`
 
 	if resp != mustBe {
+		t.Fatal("Not equal")
+	}
+}
+
+// TEST #2
+
+type ThrowsError struct {
+	Value bool `json:"value"`
+}
+
+func (a ThrowsError) Resolve(ctx *map[string]any, fields []string) error {
+	return fmt.Errorf("Error throws here")
+}
+
+func TestResolveError(t *testing.T) {
+	query := []any{
+		"value",
+	}
+
+	_, err := Process(query, ThrowsError{}, map[string]any{})
+	if err == nil || err.Error() != "Error throws here" {
 		t.Fatal("Not equal")
 	}
 }

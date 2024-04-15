@@ -35,11 +35,17 @@ func recursiveProcessRequest(r []interface{}, ctx map[string]interface{}, path [
 
 		// Calling the "Resolve" method that can change context values (you can use context values in another resolver functions)
 		// Use the "Resolve" method to connect with a database for example
-		// func (a ResponseStruct) Resolve(contextMap *map[string]interface{}, neededFields []string) {...}
-		resolveMethod.Call([]reflect.Value{
+		// func (a ResponseStruct) Resolve(contextMap *map[string]interface{}, neededFields []string) error {...}
+		res := resolveMethod.Call([]reflect.Value{
 			reflect.ValueOf(&ctx),
 			reflect.ValueOf(neededFields),
 		})
+
+		if len(res) == 1 {
+			if err, ok := res[0].Interface().(error); ok && err != nil {
+				return []interface{}{}, err
+			}
+		}
 	}
 
 	// List of already processed fields (in the case when one fields mentioned many times in the request body)

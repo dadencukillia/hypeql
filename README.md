@@ -68,8 +68,8 @@ type Response struct {
 
 **You have two ways to create Resolver functions that will take information from the database:**
 > The names of the Resolver functions must match the values of the "fun" tags.<br>Also  important: Resolver functions is methods of the response structs and there is a rule:
-> - ✔️ Correct: `func (a Response) Resolve(...) {...}`
-> - ❌ Incorrect: `func (a *Response) Resolve(...) {...}` (Don't use `*` symbol)
+> - ✔️ Correct: `func (a Response) Resolve(...) error {...}`
+> - ❌ Incorrect: `func (a *Response) Resolve(...) error {...}` (Don't use `*` symbol)
 
 *Way #1 (multiple database requests)*:
 ```
@@ -97,9 +97,13 @@ func (a Response) Rfeatures(ctx *map[string]any, args map[string]any) []Feature 
 *Way #2 (one database request)*:
 ```
 // neededFields is Slice, is can be ["version", "lastUpdate", "isBeta", "features"] in our example
-func (a Response) Resolve(ctx *map[string]any, neededFields []string) {
+func (a Response) Resolve(ctx *map[string]any, neededFields []string) error {
     // MagicFunctions does not exist, I invented it to show an example of possible operations
-    values := MagicFunctions.ReadValuesFromDB(neededFields)
+    values, err := MagicFunctions.ReadValuesFromDB(neededFields)
+    if err != nil {
+        return error
+    }
+
     for index, field := range neededFields {
         // Works if MagicFunctions.ReadValuesFromDB returns values in the same order
         (*ctx)[field] = values[index]
