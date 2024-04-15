@@ -68,8 +68,8 @@ type Response struct {
 
 **You have two ways to create Resolver functions that will take information from the database:**
 > The names of the Resolver functions must match the values of the "fun" tags.<br>Also  important: Resolver functions is methods of the response structs and there is a rule:
-> - ✔️ Correct: `func (a Response) Resolver(...) {...}`
-> - ❌ Incorrect: `func (a *Response) Resolver(...) {...}` (Don't use `*` symbol)
+> - ✔️ Correct: `func (a Response) Resolve(...) {...}`
+> - ❌ Incorrect: `func (a *Response) Resolve(...) {...}` (Don't use `*` symbol)
 
 *Way #1 (multiple database requests)*:
 ```
@@ -97,7 +97,7 @@ func (a Response) Rfeatures(ctx *map[string]any, args map[string]any) []Feature 
 *Way #2 (one database request)*:
 ```
 // neededFields is Slice, is can be ["version", "lastUpdate", "isBeta", "features"] in our example
-func (a Response) Resolver(ctx *map[string]any, neededFields []string) {
+func (a Response) Resolve(ctx *map[string]any, neededFields []string) {
     // MagicFunctions does not exist, I invented it to show an example of possible operations
     values := MagicFunctions.ReadValuesFromDB(neededFields)
     for index, field := range neededFields {
@@ -159,7 +159,7 @@ Do you remember the "args" argument in the Resolver function? Well, in a query, 
 {
     version
     isBeta
-    features(max: 3) { # Query changed here, new arg "max"
+    features(max: 3, secondArgumentExample: "Hello\nWorld") { # Query changed here, new arg "max"
         title
     }
 }
@@ -178,6 +178,13 @@ func (a Response) Rfeatures(ctx *map[string]any, args map[string]any) any {
     return features
 }
 ```
+
+Well, you know how a query language works. But you also need to know how to shorten the query. Query shortening is usually used in production mode. Here's what the previous example will look like in a shortened version:
+
+```
+{version,isBeta,features(max:3,secondArgumentExample:"Hello\nWorld"){title}}
+```
+
 </details>
 
 <details><summary>5. Simple HTTP Server</summary>
@@ -190,7 +197,7 @@ import (
 ```
 There are two functions in the package: "Process" and "RequestBodyParse".
 - "RequestBodyParse" function needed to convert a query to understandable hypeql data type.
-- "Process" function needed to process query (put it as the first argument) and return the result (JSON string and if error happened boolean).
+- "Process" function needed to process query (put it as the first argument) and return the result (JSON string and error).
 
 So let's create a server:
 ```
@@ -204,25 +211,26 @@ import (
 func main() {
     http.HandleFunc("POST /api", func(w http.ResponseWriter, r *http.Request) {
         // Reading request body
-		bodyContent, err := io.ReadAll(r.Body)
-		r.Body.Close()
-		if err != nil {
-			return
-		}
+        bodyContent, err := io.ReadAll(r.Body)
+        r.Body.Close()
+        if err != nil {
+            return
+        }
 
         // Parsing request body
-		parsedBody, err := hypeql.RequestBodyParse(string(bodyContent))
-		if err != nil {
-			return
-		}
+        parsedBody, err := hypeql.RequestBodyParse(string(bodyContent))
+        if err != nil {
+            return
+        }
 
-		// Generating response body
+        // Generating response body
         initialCtx := map[string]any{}
         responseStructInstance := Response{} // Can be filled if there are not Resolver functions
 
-		out, isError := hypeql.Process(parsedBody, responseStructInstance, initialCtx)
-        if isError {
+        out, err := hypeql.Process(parsedBody, responseStructInstance, initialCtx)
+        if err != nil {
             w.WriteHeader(http.StatusBadRequest)
+            w.Write([]byte("Error: " + err.Error()))
         }
 
         return out

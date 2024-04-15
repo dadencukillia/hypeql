@@ -199,12 +199,13 @@ fetch("/api", {
 			return
 		}
 		// Generating response body
-		out, isError := hypeql.Process(i, Response{}, map[string]interface{}{
+		out, err := hypeql.Process(i, Response{}, map[string]interface{}{
 			"randSeed": seed,
 		})
 
-		if isError {
-			return
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Error: " + err.Error()))
 		}
 
 		// Sending response

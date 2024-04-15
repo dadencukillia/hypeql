@@ -3,21 +3,10 @@ package hypeql
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"reflect"
 	"slices"
-	"strconv"
 	"strings"
 )
-
-// Generates json with errors list from argument
-func jsonStringWithErrors(errors []string) string {
-	cont, _ := json.Marshal(map[string]interface{}{
-		"errors": errors,
-	})
-
-	return string(cont)
-}
 
 // Processes a request's brances recursively
 func recursiveProcessRequest(r []interface{}, ctx map[string]interface{}, path []string, ds interface{}) (interface{}, error) {
@@ -205,270 +194,24 @@ a:
 	return ret, nil
 }
 
-// Processes a request body and returns a result (the first is JSON string, the second is it error value)
-func Process(requestBody []interface{}, dataStruct interface{}, initContext map[string]interface{}) (string, bool) {
-
+// Processes a request body and returns a result (the first is JSON string)
+func Process(requestBody []interface{}, dataStruct interface{}, initContext map[string]interface{}) (string, error) {
 	// dataStruct argument must be Struct
 	if reflect.TypeOf(dataStruct).Kind() != reflect.Struct {
-		log.Panicln("dataStruct argument must contains empty instance of struct")
+		return "", fmt.Errorf("dataStruct argument must be instance of struct")
 	}
 
 	// Start recursion to process all fields in the request
 	i, err := recursiveProcessRequest(requestBody, initContext, []string{}, dataStruct)
 	if err != nil {
-		return jsonStringWithErrors([]string{err.Error()}), true
+		return "", err
 	}
 
 	// Converting result to JSON string and return
 	q, err := json.Marshal(i)
 	if err != nil {
-		return jsonStringWithErrors([]string{"JSON converting error"}), true
+		return "", fmt.Errorf("JSON converting error")
 	}
 
-	return string(q), false
-}
-
-// Cleans whitespace symbols.
-// Use it for the body parsing, but DON'T use it to clean the full code to process it because space symbols also removing from an argument brackets value
-func cleanUp(a string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(a, " ", ""), "\t", ""), "\n", "")
-}
-
-// Converts the request body content to an interfaces slice to process it in "Process" function
-func RequestBodyParse(body string) ([]interface{}, error) {
-	body = strings.Trim(strings.ReplaceAll(body, "\t", ""), " ")
-	res := []interface{}{}
-	varOpened := false
-	keyWrite := true
-	vars := map[string]interface{}{}
-	key := ""
-	quoteOpened := false
-	valueSlash := false
-	comment := false
-	value := ""
-	k := ""
-
-	for _, c := range body {
-		if c != '\\' && c != '"' && c != 'n' && varOpened && !keyWrite && valueSlash {
-			valueSlash = false
-		}
-
-		if comment && c != '\n' {
-			continue
-		}
-
-		switch c {
-
-		case '{':
-			if cleanUp(k) != "" {
-				k += string(c)
-			}
-
-		case '\n':
-			if varOpened {
-				return []interface{}{}, fmt.Errorf("argument declaration have interputted by \\n symbol")
-			}
-
-			cu := cleanUp(k)
-			if cu != "" {
-				if strings.Contains(cu, "{") {
-					k += string(c)
-				} else {
-					res = append(res, cu)
-					k = ""
-				}
-			}
-			comment = false
-
-		case '#':
-			if !varOpened {
-				comment = true
-			}
-
-		case '(':
-			if varOpened {
-				if !keyWrite {
-					value += string(c)
-				}
-			} else {
-				if !strings.Contains(k, "{") {
-					varOpened = true
-					key = ""
-					value = ""
-					vars = map[string]interface{}{}
-					keyWrite = true
-					quoteOpened = false
-				}
-			}
-
-		case ':':
-			if varOpened {
-				if keyWrite {
-					keyWrite = false
-				} else {
-					value += string(c)
-				}
-			}
-
-		case ' ':
-			if varOpened {
-				if !keyWrite {
-					value += string(c)
-				}
-			} else {
-				cu := cleanUp(k)
-				if cu != "" {
-					if strings.Contains(cu, "{") {
-						k += string(c)
-					} else {
-						res = append(res, cu)
-						k = ""
-					}
-				}
-			}
-
-		case '\\':
-			if varOpened {
-				if !keyWrite {
-					if valueSlash {
-						value += string(c)
-						valueSlash = false
-					} else {
-						valueSlash = true
-					}
-				}
-			}
-
-		case '"':
-			if varOpened {
-				if !keyWrite {
-					if valueSlash {
-						value += string(c)
-						valueSlash = false
-					} else if quoteOpened {
-						quoteOpened = false
-					} else {
-						quoteOpened = true
-					}
-				}
-			}
-
-		case ',':
-			if varOpened {
-				if !keyWrite {
-					if !quoteOpened {
-						if cleanUp(key) != "" {
-							if len(value) > 0 && value[0] == ' ' {
-								value = value[1:]
-							}
-							if i, err := strconv.Atoi(value); err == nil {
-								vars[key] = i
-							} else {
-								vars[key] = value
-							}
-
-							key = ""
-							value = ""
-							keyWrite = true
-						}
-					}
-				}
-			} else {
-				cu := cleanUp(k)
-				if cu != "" {
-					if !strings.Contains(cu, "{") {
-						res = append(res, cu)
-						k = ""
-					} else {
-						k += string(c)
-					}
-				}
-			}
-
-		case ')':
-			if varOpened {
-				if keyWrite {
-					varOpened = false
-				} else {
-					if !quoteOpened {
-						if cleanUp(key) != "" {
-							if len(value) > 0 && value[0] == ' ' {
-								value = value[1:]
-							}
-							if i, err := strconv.Atoi(value); err == nil {
-								vars[key] = i
-							} else {
-								vars[key] = value
-							}
-
-							varOpened = false
-						}
-					}
-				}
-			}
-
-		case '}':
-			if varOpened {
-				if !keyWrite {
-					value += string(c)
-				}
-			} else {
-				cu := cleanUp(k)
-				if cu != "" {
-					if !strings.Contains(cu, "{") {
-						res = append(res, cu)
-						k = ""
-					} else if strings.Count(cu, "{") == strings.Count(cu, "}")+1 {
-						k += string(c)
-						i := strings.Index(k, "{")
-						name := cleanUp(k[:i])
-						block := k[i:]
-						u, err := RequestBodyParse(block)
-						if err != nil {
-							return []interface{}{}, err
-						}
-
-						a := []interface{}{
-							name,
-							u,
-						}
-
-						if len(vars) != 0 {
-							a = append(a, vars)
-						}
-
-						res = append(res, a)
-						k = ""
-						vars = map[string]interface{}{}
-					} else {
-						k += string(c)
-					}
-				}
-			}
-
-		default:
-			if varOpened {
-				if keyWrite {
-					key += string(c)
-				} else {
-					if c == 'n' && valueSlash {
-						value += "\n"
-						valueSlash = false
-					} else {
-						value += string(c)
-					}
-				}
-			} else {
-				k += string(c)
-			}
-		}
-	}
-
-	if strings.Contains(k, "{") {
-		return []interface{}{}, fmt.Errorf("the curly bracket is not closed")
-	} else if varOpened {
-		return []interface{}{}, fmt.Errorf("the arguments in parentheses were not written")
-	}
-
-	return res, nil
+	return string(q), nil
 }
