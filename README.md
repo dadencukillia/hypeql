@@ -68,8 +68,8 @@ type Response struct {
 
 **You have two ways to create Resolver functions that will take information from the database:**
 > The names of the Resolver functions must match the values of the "fun" tags.<br>Also  important: Resolver functions is methods of the response structs and there is a rule:
-> - ✔️ Correct: `func (a Response) Resolve(...) error {...}`
-> - ❌ Incorrect: `func (a *Response) Resolve(...) error {...}` (Don't use `*` symbol)
+> - ✔️ Correct: `func (a Response) AnyResolverFunctions(...) {...}`
+> - ❌ Incorrect: `func (a *Response) AnyResolverFunctions(...) {...}` (Don't use `*` symbol)
 
 *Way #1 (multiple database requests)*:
 ```

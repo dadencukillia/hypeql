@@ -54,18 +54,11 @@ func recursiveProcessRequest(r []interface{}, ctx map[string]interface{}, path [
 	// Traversing and receiving values of needed fields by listed tags
 a:
 	for _, i := range r {
-		kind := reflect.TypeOf(i).Kind()
-
-		// Single (Basic) value (i = field's tag)
-		if kind == reflect.String {
-			// Getting field's tag name
-			key := fmt.Sprint(i)
-
+		if key, ok := i.(string); ok { // i's value is a basic (single) data (i = field's tag name)
 			// Skipping if field already processed
 			if slices.Contains(checked, key) {
 				continue
 			}
-
 			checked = append(checked, key)
 
 			newPath := strings.Join(append(path, key), ".")
@@ -105,8 +98,8 @@ a:
 
 			// If field does not found
 			return []interface{}{}, fmt.Errorf(newPath + " not found in the struct")
-		} else if kind == reflect.Slice { // List of objects (branches) (i = [field's name, object's needed fields, arguments])
-			sliceVal, _ := i.([]interface{})
+
+		} else if sliceVal, ok := i.([]interface{}); ok { // i's value is list of objects (branches) (i example: [field's name, object's needed fields, arguments])
 			arguments := map[string]interface{}{}
 
 			if len(sliceVal) != 2 && len(sliceVal) != 3 {
@@ -192,7 +185,9 @@ a:
 
 			// Field not found
 			return []interface{}{}, fmt.Errorf(newPath + " field not found in the struct")
+
 		} else {
+			// Unknown data type
 			return []interface{}{}, fmt.Errorf(strings.Join(path, ".") + " incorrect data type. The String or Slice types only allowed")
 		}
 	}
