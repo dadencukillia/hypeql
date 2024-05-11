@@ -9,7 +9,7 @@ import (
 )
 
 // Processes a request's brances recursively
-func recursiveProcessRequest(r []interface{}, ctx map[string]interface{}, path []string, ds interface{}) (interface{}, error) {
+func (a responseGenerator) recursiveGenerateResponse(r []interface{}, ctx map[string]interface{}, path []string, ds interface{}, deep uint64) (interface{}, error) {
 	// Map for returning
 	var ret map[string]interface{} = map[string]interface{}{}
 	branchRefVal := reflect.ValueOf(ds)
@@ -139,6 +139,11 @@ a:
 
 				if sf.Tag.Get("json") == tagName && sf.Type.Kind() == reflect.Slice {
 					// When field found
+
+					if a.Config.MaxDeepRecursion != 0 && deep+1 > a.Config.MaxDeepRecursion {
+						return []interface{}{}, fmt.Errorf(newPath + ": max deep recursion reached")
+					}
+
 					l := branchRefVal.Field(i)
 
 					// Getting middleware function's name
@@ -168,7 +173,7 @@ a:
 							continue
 						}
 
-						i, err := recursiveProcessRequest(neededFields, ctx, append(path, tagName), p)
+						i, err := a.recursiveGenerateResponse(neededFields, ctx, append(path, tagName), p, deep+1)
 						if err != nil {
 							return []interface{}{}, err
 						}
@@ -196,14 +201,14 @@ a:
 }
 
 // Processes a request body and returns a result (the first is JSON string)
-func Process(requestBody []interface{}, dataStruct interface{}, initContext map[string]interface{}) (string, error) {
+func (a responseGenerator) Generate(requestBody []interface{}, dataStruct interface{}, initContext map[string]interface{}) (string, error) {
 	// dataStruct argument must be Struct
 	if reflect.TypeOf(dataStruct).Kind() != reflect.Struct {
 		return "", fmt.Errorf("dataStruct argument must be instance of struct")
 	}
 
 	// Start recursion to process all fields in the request
-	i, err := recursiveProcessRequest(requestBody, initContext, []string{}, dataStruct)
+	i, err := a.recursiveGenerateResponse(requestBody, initContext, []string{}, dataStruct, 1)
 	if err != nil {
 		return "", err
 	}

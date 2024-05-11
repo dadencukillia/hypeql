@@ -7,7 +7,11 @@ import (
 )
 
 // Converts the request body content to an interfaces slice to process it in "Process" function
-func RequestBodyParse(body string) ([]interface{}, error) {
+func (a queryParser) Parse(body string) ([]interface{}, error) {
+	return a.parseRecursion(body, 1)
+}
+
+func (a queryParser) parseRecursion(body string, deep uint64) ([]interface{}, error) {
 	body = strings.Trim(strings.ReplaceAll(body, "\t", ""), " ")
 	res := []interface{}{}
 	varOpened := false
@@ -211,11 +215,15 @@ func RequestBodyParse(body string) ([]interface{}, error) {
 						res = append(res, cu)
 						k = ""
 					} else if strings.Count(cu, "{") == strings.Count(cu, "}")+1 {
+						if a.Config.MaxDeepRecursion != 0 && deep+1 > a.Config.MaxDeepRecursion {
+							return []interface{}{}, fmt.Errorf("max deep recursion reached")
+						}
+
 						k += string(c)
 						i := strings.Index(k, "{")
 						name := cleanUp(k[:i])
 						block := k[i:]
-						u, err := RequestBodyParse(block)
+						u, err := a.parseRecursion(block, deep+1)
 						if err != nil {
 							return []interface{}{}, err
 						}

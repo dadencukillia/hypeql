@@ -120,6 +120,13 @@ type Comment struct {
 }
 
 func main() {
+	parser := hypeql.NewQueryParser(hypeql.QueryParserConfig{
+		MaxDeepRecursion: 3,
+	})
+	generator := hypeql.NewResponseGenerator(hypeql.ResponseGeneratorConfig{
+		MaxDeepRecursion: 3,
+	})
+
 	// Main page
 	http.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		// Not found page
@@ -194,12 +201,12 @@ fetch("/api", {
 		}
 
 		// Parsing request body
-		i, err := hypeql.RequestBodyParse(string(cont))
+		i, err := parser.Parse(string(cont))
 		if err != nil {
 			return
 		}
 		// Generating response body
-		out, err := hypeql.Process(i, Response{}, map[string]interface{}{
+		out, err := generator.Generate(i, Response{}, map[string]interface{}{
 			"randSeed": seed,
 		})
 

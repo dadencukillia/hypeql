@@ -1,5 +1,9 @@
-# hypeql
-GraphQL like query language and a runtime environment for executing queries with dynamic data loading (using Resolvers system) for Golang.
+# HypeQL
+<div style="text-align:center;">
+<img alt="HypeQL logo" style="width:25%;" src="https://ucarecdn.com/71471476-0e8e-4123-ac3b-47922da7a340/hypeql_logo.svg">
+</div>
+
+**HypeQL** — GraphQL like query language and a runtime environment for executing queries with dynamic data loading (using Resolvers system) for Golang.
 
 # Future plans (To Do)
 ## Will updated soon:
@@ -199,9 +203,9 @@ import (
     "github.com/dadencukillia/hypeql"
 )
 ```
-There are two functions in the package: "Process" and "RequestBodyParse".
-- "RequestBodyParse" function needed to convert a query to understandable hypeql data type.
-- "Process" function needed to process query (put it as the first argument) and return the result (JSON string and error).
+There are two functions in the package: "NewQueryParser" and "NewResponseGenerator".
+- "NewQueryParser" function creates a struct instance that has "`Parse`" function needed to convert a query to understandable hypeql data type.
+- "NewResponseGenerator" function creates a struct instance that has "`Generate`" function needed to process query (put it as the first argument) and return the result (JSON string and error).
 
 So let's create a server:
 ```
@@ -213,6 +217,9 @@ import (
 // Structs and Resolver functions that we already created in previous steps must be here.
 
 func main() {
+    parser := hypeql.NewQueryParser(QueryParserConfig{})
+    generator := hypeql.NewResponseGenerator(ResponseGeneratorConfig{})
+
     http.HandleFunc("POST /api", func(w http.ResponseWriter, r *http.Request) {
         // Reading request body
         bodyContent, err := io.ReadAll(r.Body)
@@ -222,7 +229,7 @@ func main() {
         }
 
         // Parsing request body
-        parsedBody, err := hypeql.RequestBodyParse(string(bodyContent))
+        parsedBody, err := parser.Parse(string(bodyContent))
         if err != nil {
             return
         }
@@ -231,7 +238,7 @@ func main() {
         initialCtx := map[string]any{}
         responseStructInstance := Response{} // Can be filled if there are not Resolver functions
 
-        out, err := hypeql.Process(parsedBody, responseStructInstance, initialCtx)
+        out, err := generator.Generate(parsedBody, responseStructInstance, initialCtx)
         if err != nil {
             w.WriteHeader(http.StatusBadRequest)
             w.Write([]byte("Error: " + err.Error()))

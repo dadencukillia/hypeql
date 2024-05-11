@@ -6,6 +6,8 @@ import (
 )
 
 func TestQueryAndInterface(t *testing.T) {
+	parser := NewQueryParser(QueryParserConfig{})
+
 	query := `
 	{
 		version
@@ -29,7 +31,7 @@ func TestQueryAndInterface(t *testing.T) {
 		},
 	}
 
-	parsed, err := RequestBodyParse(query)
+	parsed, err := parser.Parse(query)
 	if err != nil {
 		t.Fatal("Parsing error: ", err.Error())
 	}
@@ -40,6 +42,8 @@ func TestQueryAndInterface(t *testing.T) {
 }
 
 func TestShortenVariant(t *testing.T) {
+	parser := NewQueryParser(QueryParserConfig{})
+
 	longQuery := `
 	{
 		version # Many Comments
@@ -50,12 +54,12 @@ func TestShortenVariant(t *testing.T) {
 	}`
 	shortQuery := `{version,isBeta,feature(max:"1"){title}}`
 
-	longParsed, err := RequestBodyParse(longQuery)
+	longParsed, err := parser.Parse(longQuery)
 	if err != nil {
 		t.Fatal("(long) Parsing error: ", err.Error())
 	}
 
-	shortParsed, err := RequestBodyParse(shortQuery)
+	shortParsed, err := parser.Parse(shortQuery)
 	if err != nil {
 		t.Fatal("(short) Parsing error: ", err.Error())
 	}
@@ -66,6 +70,8 @@ func TestShortenVariant(t *testing.T) {
 }
 
 func TestArgsQuery(t *testing.T) {
+	parser := NewQueryParser(QueryParserConfig{})
+
 	query := `
 	{
 		test(A: 1, B: "1", C: "Hello\nWorld\"", D: "Hello,"" World") {}
@@ -84,7 +90,7 @@ func TestArgsQuery(t *testing.T) {
 		},
 	}
 
-	parsed, err := RequestBodyParse(query)
+	parsed, err := parser.Parse(query)
 	if err != nil {
 		t.Fatal("Parsing error: " + err.Error())
 	}
@@ -95,14 +101,27 @@ func TestArgsQuery(t *testing.T) {
 }
 
 func TestInvalidQuery(t *testing.T) {
+	parser := NewQueryParser(QueryParserConfig{})
+
 	query := `
 	{
 		Hello(Args1
 		) { {
 	}`
 
-	_, err := RequestBodyParse(query)
+	_, err := parser.Parse(query)
 	if err == nil {
 		t.Fatal("No errors")
+	}
+}
+
+func TestDeepRecursionLimitParser(t *testing.T) {
+	parser := NewQueryParser(QueryParserConfig{
+		MaxDeepRecursion: 3,
+	})
+
+	_, err := parser.Parse("{seconds{thirds{fourths{cantreach}}}}")
+	if err == nil {
+		t.Fatal("Not equal")
 	}
 }

@@ -58,6 +58,9 @@ func (a C) Rfoo(ctx *map[string]any) any {
 }
 
 func TestGeneral(t *testing.T) {
+	parser := NewQueryParser(QueryParserConfig{})
+	generator := NewResponseGenerator(ResponseGeneratorConfig{})
+
 	query := `
 	{
 		foo
@@ -69,12 +72,12 @@ func TestGeneral(t *testing.T) {
 
 	// mustBe := `{}`
 
-	parsed, err := RequestBodyParse(query)
+	parsed, err := parser.Parse(query)
 	if err != nil {
 		t.Fatal("Parsing error: " + err.Error())
 	}
 
-	resp, err := Process(parsed, A{}, map[string]any{})
+	resp, err := generator.Generate(parsed, A{}, map[string]any{})
 	if err != nil {
 		t.Fatal("Process error: " + err.Error())
 	}
@@ -97,12 +100,63 @@ func (a ThrowsError) Resolve(ctx *map[string]any, fields []string) error {
 }
 
 func TestResolveError(t *testing.T) {
+	generator := NewResponseGenerator(ResponseGeneratorConfig{})
+
 	query := []any{
 		"value",
 	}
 
-	_, err := Process(query, ThrowsError{}, map[string]any{})
+	_, err := generator.Generate(query, ThrowsError{}, map[string]any{})
 	if err == nil || err.Error() != "Error throws here" {
+		t.Fatal("Not equal")
+	}
+}
+
+// TEST #3
+
+type First struct {
+	Seconds []Second `json:"seconds"`
+}
+
+type Second struct {
+	Thirds []Third `json:"thirds"`
+}
+
+type Third struct {
+	Fourths []Fourth `json:"fourths"`
+}
+
+type Fourth struct {
+	CantReach string `json:"cantreach"` // Can't reach because of deep recursion limit
+}
+
+func TestDeepRecursionLimitGenerator(t *testing.T) {
+	parser := NewQueryParser(QueryParserConfig{})
+	generator := NewResponseGenerator(ResponseGeneratorConfig{
+		MaxDeepRecursion: 3,
+	})
+
+	parsedQuery, err := parser.Parse("{seconds{thirds{fourths{cantreach}}}}")
+	if err != nil {
+		t.Fatal("Parsing error: " + err.Error())
+	}
+
+	_, err = generator.Generate(parsedQuery, First{
+		Seconds: []Second{
+			{
+				Thirds: []Third{
+					{
+						Fourths: []Fourth{
+							{
+								CantReach: "",
+							},
+						},
+					},
+				},
+			},
+		},
+	}, map[string]any{})
+	if err == nil {
 		t.Fatal("Not equal")
 	}
 }
